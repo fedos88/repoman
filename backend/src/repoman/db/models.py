@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -14,6 +15,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Uuid,
     func,
     text,
 )
@@ -137,6 +139,47 @@ class ApiToken(TimestampMixin, Base):
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# --- Storage -----------------------------------------------------------------------------
+
+BLOB_STORE_TYPES = ("filesystem", "s3")
+
+
+class BlobStore(Base):
+    __tablename__ = "blob_stores"
+    __table_args__ = (CheckConstraint(_in("type", BLOB_STORE_TYPES), name="type"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True)
+    type: Mapped[str] = mapped_column(String(16))
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, server_default=func.now()
+    )
+
+
+class Blob(Base):
+    """Immutable stored object (design §7.1); the database is the source of truth."""
+
+    __tablename__ = "blobs"
+    __table_args__ = (
+        Index(
+            "ix_blobs_deleted_at",
+            "deleted_at",
+            postgresql_where=text("deleted_at IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    blob_store_id: Mapped[int] = mapped_column(ForeignKey("blob_stores.id"), index=True)
+    size: Mapped[int] = mapped_column(BigInteger)
+    sha256: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, server_default=func.now()
+    )
+    # Set when no longer referenced; the object is removed after the grace period.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 # --- Background jobs ---------------------------------------------------------------------

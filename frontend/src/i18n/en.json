@@ -9,7 +9,8 @@
     "users": "Users",
     "admin": "Administration",
     "ldap": "Active Directory",
-    "jobs": "Jobs"
+    "jobs": "Jobs",
+    "storage": "Storage"
   },
   "header": {
     "toggleTheme": "Toggle theme",
@@ -160,7 +161,8 @@
     "ldap_base_dn_not_found": "Base DN not found",
     "ldap_invalid_filter": "Invalid LDAP filter",
     "ldap_search_failed": "LDAP search failed",
-    "ldap_secret_unreadable": "The saved password cannot be decrypted (was REPOMAN_SECRET_KEY changed?) — enter it again"
+    "ldap_secret_unreadable": "The saved password cannot be decrypted (was REPOMAN_SECRET_KEY changed?) — enter it again",
+    "blob_store_not_found": "Blob store not found"
   },
   "home": {
     "tagline": "A free open-source repository manager that proxies and caches upstream sources.",
@@ -335,7 +337,9 @@
     "logsTitle": "Job #{{id}}: {{type}}",
     "cancel": "Cancel",
     "types": {
-      "ldap_sync": "AD synchronization"
+      "ldap_sync": "AD synchronization",
+      "blob_gc": "Blob removal",
+      "blob_store_cleanup": "Storage cleanup"
     },
     "statuses": {
       "queued": "Queued",
@@ -344,5 +348,21 @@
       "failed": "Failed",
       "cancelled": "Cancelled"
     }
+  },
+  "storage": {
+    "title": "Storage",
+    "types": {
+      "filesystem": "Filesystem",
+      "s3": "S3"
+    },
+    "disk": "Disk",
+    "diskUsage": "{{used}} of {{total}} used, {{free}} free",
+    "blobCount": "Objects",
+    "usedBytes": "Objects size",
+    "pendingDelete": "Pending deletion",
+    "pendingDeleteHint": "Deleted objects are physically removed after 24 hours to keep backups consistent.",
+    "lowSpaceThreshold": "Low-space threshold",
+    "lowSpaceTitle": "Low free space",
+    "lowSpace": "Less than {{threshold}} free: new objects are not stored, proxy repositories serve files without caching."
   }
 }

@@ -9,7 +9,8 @@
     "users": "Пользователи",
     "admin": "Администрирование",
     "ldap": "Active Directory",
-    "jobs": "Задания"
+    "jobs": "Задания",
+    "storage": "Хранилища"
   },
   "header": {
     "toggleTheme": "Переключить тему",
@@ -164,7 +165,8 @@
     "ldap_base_dn_not_found": "Base DN не найден",
     "ldap_invalid_filter": "Некорректный LDAP-фильтр",
     "ldap_search_failed": "Ошибка поиска в LDAP",
-    "ldap_secret_unreadable": "Сохранённый пароль не расшифровывается (изменён REPOMAN_SECRET_KEY?) — введите его заново"
+    "ldap_secret_unreadable": "Сохранённый пароль не расшифровывается (изменён REPOMAN_SECRET_KEY?) — введите его заново",
+    "blob_store_not_found": "Хранилище не найдено"
   },
   "home": {
     "tagline": "Бесплатный open-source менеджер репозиториев с проксированием и кэшированием upstream-источников.",
@@ -339,7 +341,9 @@
     "logsTitle": "Задание #{{id}}: {{type}}",
     "cancel": "Отменить",
     "types": {
-      "ldap_sync": "Синхронизация с AD"
+      "ldap_sync": "Синхронизация с AD",
+      "blob_gc": "Удаление объектов",
+      "blob_store_cleanup": "Очистка хранилища"
     },
     "statuses": {
       "queued": "В очереди",
@@ -348,5 +352,21 @@
       "failed": "Ошибка",
       "cancelled": "Отменено"
     }
+  },
+  "storage": {
+    "title": "Хранилища",
+    "types": {
+      "filesystem": "Файловая система",
+      "s3": "S3"
+    },
+    "disk": "Диск",
+    "diskUsage": "занято {{used}} из {{total}}, свободно {{free}}",
+    "blobCount": "Объектов",
+    "usedBytes": "Объём объектов",
+    "pendingDelete": "Ожидают удаления",
+    "pendingDeleteHint": "Удалённые объекты физически удаляются через 24 часа — это защищает согласованность бэкапов.",
+    "lowSpaceThreshold": "Порог «мало места»",
+    "lowSpaceTitle": "Мало свободного места",
+    "lowSpace": "Свободно меньше {{threshold}}: новые объекты не сохраняются, proxy-репозитории отдают файлы без кэширования."
   }
 }

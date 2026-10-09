@@ -19,3 +19,17 @@ async def upsert_schedule(
     schedule.interval_seconds = interval_seconds
     schedule.enabled = enabled
     return schedule
+
+
+async def ensure_schedule(db: AsyncSession, job_type: str, interval_seconds: int) -> Schedule:
+    """Create a system schedule if it does not exist; an existing one is left as is."""
+    schedule = await db.get(Schedule, job_type)
+    if schedule is None:
+        schedule = Schedule(
+            job_type=job_type,
+            interval_seconds=interval_seconds,
+            next_run_at=datetime.now(UTC) + timedelta(seconds=interval_seconds),
+            enabled=True,
+        )
+        db.add(schedule)
+    return schedule

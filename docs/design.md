@@ -192,7 +192,6 @@ docs/
 | `serve_stale` | nullable; `NULL` = системный default |
 | `online` | выключенный репозиторий отвечает `503` |
 | `status` | `active` / `deleting` (позже `migrating`, …) |
-| `generation` | поколение кэша, см. §6.6 |
 | `description` | |
 
 Анонимный доступ — не отдельное поле, а право `read` у роли `anonymous` (в UI — галочка «Анонимный доступ» в форме репозитория).
@@ -242,7 +241,7 @@ GET /repository/{name}/{path}
   1. Найти репозиторий, проверить право read (§8.5)
   2. Классифицировать путь
   3. Negative cache: свежая запись → 404 (X-RepoMan-Cache: NEGATIVE)
-  4. Есть запись в cache_entries (текущее generation):
+  4. Есть запись в cache_entries:
        immutable                 → отдать из blob store (HIT)
        metadata, TTL не истёк    → отдать (HIT)
        metadata, TTL истёк       → ревалидация через single-flight:
@@ -266,15 +265,15 @@ GET /repository/{name}/{path}
 
 ### 6.3. Single-flight
 
-Ключ: `(repository_id, generation, path)`. Реестр активных загрузок — в памяти процесса.
+Ключ: `(repository_id, path)`. Реестр активных загрузок — в памяти процесса.
 
 1. Первый запрос создаёт загрузку (leader), остальные присоединяются к ней.
 2. Загрузка выполняется **в отдельной задаче, не привязанной к клиентскому запросу**: отключение клиента не прерывает скачивание.
-3. Загрузка пишет во временный объект blob store, параллельно считает **sha256** и размер.
-4. Все клиенты (включая первого) получают ответ **потоково, читая растущий временный файл** — ни один не ждёт полного скачивания (иначе большие пакеты упираются в `Acquire::http::Timeout` apt).
+3. Загрузка пишет новый blob (§7), параллельно считает **sha256** и размер.
+4. Все клиенты (включая первого) получают ответ **потоково, читая растущий локальный файл** — ни один не ждёт полного скачивания (иначе большие пакеты упираются в `Acquire::http::Timeout` apt). Для filesystem это временный файл самого blob; для S3 (позже) — локальный spool-файл, из которого объект выгружается в S3.
 5. Ответ клиентам начинается после получения заголовков upstream: при `404` все получают `404`.
-6. По завершении: проверка размера против `Content-Length`, атомарный commit объекта, запись в `cache_entries` в одной транзакции.
-7. Если upstream оборвался в процессе — временный объект удаляется, клиентам рвётся соединение (apt повторит запрос).
+6. По завершении: проверка размера против `Content-Length`, commit blob, запись `blobs` + `cache_entries` в одной транзакции; заменённый blob (старая версия metadata) помечается удалённым.
+7. Если upstream оборвался в процессе — незавершённый blob удаляется, клиентам рвётся соединение (apt повторит запрос).
 8. Ревалидация metadata идёт через тот же механизм.
 
 ### 6.4. Нехватка места
@@ -285,50 +284,82 @@ GET /repository/{name}/{path}
 
 Для будущих политик очистки. Обращения к объектам накапливаются в памяти и сбрасываются в БД пачкой раз в минуту; запись обновляется не чаще раза в сутки на объект.
 
-### 6.6. Очистка репозитория (поколения кэша)
+### 6.6. Очистка и удаление репозитория
 
 Очистка мгновенна для клиентов и не требует остановки репозитория:
 
-1. В одной транзакции: `repositories.generation += 1`, создаётся job `repository_purge(repository_id, old_generation)`.
-2. Новые запросы работают с новым поколением (промахи → заново из upstream).
-3. Активные загрузки старого поколения при commit обнаруживают смену поколения и отбрасывают результат.
-4. Job удаляет строки `cache_entries` / `negative_cache` старого поколения и blob-префикс `{repository_id}/{old_generation}/`.
+1. В одной транзакции: строки `cache_entries` / `negative_cache` репозитория удаляются, их blobs помечаются удалёнными (`deleted_at`).
+2. Новые запросы — промахи, файлы заново скачиваются из upstream.
+3. Активные загрузки, начатые до очистки, при commit обнаруживают, что очистка произошла (счётчик `purged_at` репозитория), и отбрасывают результат.
+4. Физическое удаление объектов — задание `blob_gc` после grace period (§7.5).
 
-Удаление репозитория: `status=deleting`, job `repository_delete` удаляет префикс `{repository_id}/` и строки, затем сам репозиторий.
+При большом числе записей шаг 1 выполняется заданием `repository_purge` пачками; до его завершения репозиторий работает в режиме «всё — промах».
+
+Удаление репозитория: `status=deleting`, задание `repository_delete` удаляет строки и помечает blobs удалёнными, затем удаляет сам репозиторий.
 
 ---
 
 ## 7. Хранилище (blob store)
 
-### 7.1. Интерфейс
+### 7.1. Модель: blob ID
+
+Объекты хранятся под **случайными идентификаторами**, а не под путями репозиториев (модель Nexus):
+
+- **blob** — неизменяемый объект: `id` (UUID), `blob_store_id`, `size`, `sha256`, `created_at`, `deleted_at`;
+- репозитории ссылаются на blob: `cache_entries.blob_id` (proxy), позже — компоненты hosted-репозиториев;
+- **источник истины — БД**: объект без строки в `blobs` считается мусором.
+
+Почему так, а не по пути:
+
+- ключ известен до записи → в S3 объект пишется сразу в итоговый ключ (в S3 нет rename);
+- перенос между хранилищами и переименования не трогают пути;
+- удаление двухфазное с задержкой — безопасно для hosted-данных и бэкапов (§7.5);
+- sha256 в БД — проверка целостности и задел на дедупликацию.
+
+Цена — безымянные файлы на диске; соответствие «путь → blob» доступно в API/UI.
+
+### 7.2. Интерфейс
 
 ```python
-class BlobStore(Protocol):
-    async def open_read(self, key: str, start: int = 0, end: int | None = None) -> AsyncIterator[bytes]: ...
-    async def stat(self, key: str) -> BlobStat | None: ...
-    async def begin_write(self, key: str) -> BlobWriter: ...   # write(), commit(), abort()
-    async def delete(self, key: str) -> None: ...
-    async def delete_prefix(self, prefix: str) -> int: ...
-    async def iterate(self, prefix: str) -> AsyncIterator[BlobStat]: ...   # для reconcile
-    async def free_space(self) -> int | None: ...
+class BlobStorage(Protocol):
+    async def open_write(self, blob_id: UUID) -> BlobWriter: ...  # write(), commit(), abort()
+    async def open_read(self, blob_id: UUID, start: int = 0, end: int | None = None) -> AsyncIterator[bytes]: ...
+    async def stat(self, blob_id: UUID) -> BlobStat | None: ...
+    async def delete(self, blob_id: UUID) -> None: ...
+    async def iterate(self) -> AsyncIterator[BlobStat]: ...         # для поиска сирот
+    async def usage(self) -> StoreUsage | None: ...                 # total / free
 ```
 
-Proxy-логика работает только с этим интерфейсом.
+Proxy- и hosted-логика работают только с этим интерфейсом и сервисом blobs поверх него.
 
-### 7.2. Filesystem (MVP)
+### 7.3. Filesystem (MVP)
 
-- Ключ: `{repository_id}/{generation}/{path}` → `{root}/{key}`. `repository_id`, а не имя — переименование репозитория не трогает файлы.
-- Запись: временный файл `{root}/.tmp/{uuid}` → `os.replace` в итоговый путь (атомарно на одной ФС).
+- Раскладка: `{root}/blobs/{id[0:2]}/{id[2:4]}/{id}`; временные файлы — `{root}/.tmp/` (**та же ФС**, иначе rename не атомарен).
+- Запись: временный файл → `fsync` → `os.replace` в итоговый путь.
 - Блокирующие файловые операции — в thread pool.
-- Целевая платформа — Linux. Windows/macOS — только для разработки, не гарантируются.
+- Целевая платформа — Linux, хранилище — локальная ФС (ext4/xfs) через bind mount. NFS/SMB не поддерживаются (атомарность rename, блокировки).
+- Windows/macOS — только для разработки, не гарантируются.
 
-### 7.3. S3 (вне MVP)
+### 7.4. S3 (отдельный этап после APT proxy)
 
-`begin_write` → multipart upload, `commit` → complete, `delete_prefix` → batch delete.
+- Стандартный S3 API без привязки к конкретному продукту: endpoint, region, bucket, prefix, path-style, ключи доступа, свой CA. Ключи доступа шифруются в БД, как пароль LDAP.
+- `open_write` → multipart upload в итоговый ключ, `commit` → complete, `abort` → abort multipart.
+- Тесты — на SeaweedFS в контейнере. MinIO Community с декабря 2025 в режиме поддержки, официальные образы не публикуются, репозиторий архивирован — работать с ним можно, но целевой платформой не считается.
 
-### 7.4. Blob stores как сущность
+### 7.5. Удаление, сироты, нехватка места
 
-Таблица `blob_stores` (`filesystem` / `s3` + параметры). При первом старте создаётся `default` (filesystem, `REPOMAN_STORAGE_PATH`). В MVP API blob stores — только чтение. Сущность нужна для будущей миграции репозиториев между хранилищами.
+- **Удаление двухфазное:** в транзакции бизнес-операции blob помечается `deleted_at`; задание `blob_gc` (раз в час) физически удаляет объекты, у которых `deleted_at` старше **grace period (default 24 ч)**, затем строки.
+- **Сироты** (объект записан, транзакция не прошла; процесс упал): задание `blob_store_cleanup` (раз в сутки) удаляет объекты без строки в `blobs` старше 24 ч и незавершённые временные файлы старше 24 ч.
+- **Нехватка места:** порог «мало места» — `max(5% объёма, 10 ГБ)`. Ниже порога новые blobs не создаются; proxy работает в режиме pass-through (§6.4).
+
+### 7.6. Blob stores как сущность
+
+Таблица `blob_stores` (`filesystem` / `s3` + параметры). При старте создаётся/обновляется `default` (filesystem, `REPOMAN_STORAGE_PATH`). В MVP API blob stores — только чтение: путь, объём, свободное/занятое место, число объектов, объём, ожидающий удаления. Сущность нужна для S3 и миграции репозиториев между хранилищами.
+
+### 7.7. Бэкап
+
+- **Proxy-кэш** восстановим из upstream: бэкап хранилища — по желанию, БД — обязательно.
+- **Hosted-данные** невосстановимы: обязательно бэкап БД **и** хранилища, в порядке «сначала БД, затем хранилище». Grace period гарантирует, что объекты, на которые ссылается бэкап БД, ещё есть в хранилище на момент его бэкапа (бэкап хранилища должен завершиться быстрее grace period).
 
 ---
 
@@ -500,17 +531,20 @@ UI показывает время, результат (проверено / з�
 ```text
 blob_stores        id, name, type, config jsonb, created_at
 
+blobs              id uuid, blob_store_id, size, sha256, created_at, deleted_at
+                   INDEX (deleted_at) WHERE deleted_at IS NOT NULL
+
 repositories       id, name, format, type, upstream_url, blob_store_id,
                    metadata_ttl, negative_ttl, serve_stale, online, status,
-                   generation, description, created_at, updated_at
+                   purged_at, description, created_at, updated_at
 
-cache_entries      id, repository_id, generation, path, kind (immutable|metadata),
-                   blob_key, size, sha256, content_type, upstream_etag,
-                   upstream_last_modified, fetched_at, checked_at, last_accessed_at
-                   UNIQUE (repository_id, generation, path)
+cache_entries      id, repository_id, path, kind (immutable|metadata), blob_id,
+                   content_type, upstream_etag, upstream_last_modified,
+                   fetched_at, checked_at, last_accessed_at
+                   UNIQUE (repository_id, path)
 
-negative_cache     repository_id, generation, path, status_code, expires_at
-                   PK (repository_id, generation, path)
+negative_cache     repository_id, path, status_code, expires_at
+                   PK (repository_id, path)
 
 users              id, username (lowercase, unique), auth_source, password_hash,
                    must_change_password,
@@ -714,6 +748,7 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 - Готовые образы на этапе MVP не собираются и не публикуются.
 - Целевая ОС — Linux.
 - Запуск на подпути (`/repoman/...`) не поддерживается: RepoMan обслуживается от корня хоста.
+- **Хранилище в prod — bind mount** каталога хоста (например, `/srv/repoman/storage` → `/var/lib/repoman`) на локальной ФС (ext4/xfs, не NFS). Процесс в контейнере работает под uid `10001`: каталог `chown 10001:10001`, либо uid переопределяется через `user:` в compose. Объём — с запасом над размером кэша (для 500 ГБ — от 600 ГБ). Бэкап — §7.7.
 
 ### 17.1. CI
 
@@ -786,9 +821,10 @@ location /repository/ {
    - `deploy/nginx/repoman.conf`, `docker-compose.dev.yml`, CI (GitHub Actions).
 2. **Локальные пользователи:** пользователи, встроенные роли, сессии, CSRF, API-токены, первый admin, rate limit входа; API `/auth`, `/me`, `/users`, `/roles`; UI: вход, профиль (пароль, токены), администрирование пользователей.
 3. **AD:** фреймворк заданий (очередь, воркеры, планировщик), настройки LDAP, проверка подключения, вход, маппинг групп, `ldap_sync`; UI настроек AD.
-4. **Хранилище и APT proxy:** BlobStore (filesystem), классификатор, cache policy, single-flight, negative cache, serve_stale, Range/HEAD, pass-through при нехватке места; CRUD репозиториев, пользовательские роли и право `read`, Basic с токеном для apt; UI репозиториев и ролей.
-5. **Очистка и удаление репозиториев:** `repository_purge`, `repository_delete`; UI заданий.
-6. **Наблюдаемость и приёмка:** метрики, JSON-логи, E2E на Ubuntu 24.04 / 26.04, документация по развёртыванию.
+4. **Хранилище:** модель blob ID, BlobStore (filesystem), таблицы `blob_stores` / `blobs`, сервис записи/чтения blobs, задания `blob_gc` и `blob_store_cleanup`, контроль свободного места; API и UI хранилищ.
+5. **APT proxy:** классификатор, cache policy, single-flight, negative cache, serve_stale, Range/HEAD, pass-through при нехватке места; CRUD репозиториев, пользовательские роли и право `read`, Basic с токеном для apt; очистка и удаление репозиториев; UI репозиториев и ролей.
+6. **S3 blob store** (стандартный S3 API, тесты на SeaweedFS).
+7. **Наблюдаемость и приёмка:** метрики, JSON-логи, E2E на Ubuntu 24.04 / 26.04, документация по развёртыванию.
 
 UI каждой функции делается в том же этапе, что и её API.
 
