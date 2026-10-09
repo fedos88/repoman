@@ -1,5 +1,6 @@
 import hashlib
 import os
+import shutil
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -11,7 +12,12 @@ from sqlalchemy import select, update
 
 from repoman.db.models import Blob, BlobStore, Job, Schedule
 from repoman.jobs.queue import enqueue
-from repoman.storage.base import BlobNotFoundError, StorageFullError, StorageUsage
+from repoman.storage.base import (
+    BlobNotFoundError,
+    QuotaExceededError,
+    StorageFullError,
+    StorageUsage,
+)
 from repoman.storage.bootstrap import ensure_default_store
 from repoman.storage.filesystem import FilesystemBlobStorage
 from repoman.storage.policy import BLOB_GC_JOB, STORE_CLEANUP_JOB
@@ -233,3 +239,167 @@ async def test_blob_stores_api(app: FastAPI, api, create_user, blobs, store_id) 
     assert (await api.get(f"/api/v1/blob-stores/{store_id}")).json()["id"] == store_id
     response = await api.get("/api/v1/blob-stores/999")
     assert response.json()["error"]["code"] == "blob_store_not_found"
+
+
+# --- blob store management ----------------------------------------------------------------
+
+
+@pytest.fixture
+async def admin_api(api, create_user, store_id):
+    await create_user("root", roles=("admin",))
+    await api.login("root", "password123")
+    return api
+
+
+async def add_store(admin_api, name: str, path: Path, **extra) -> dict:
+    response = await admin_api.post(
+        "/api/v1/blob-stores", json={"name": name, "path": str(path), **extra}
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+async def test_create_store_and_validation(app: FastAPI, admin_api, tmp_path: Path) -> None:
+    disk2 = tmp_path / "disk2" / "repoman"
+    store = await add_store(admin_api, " Disk2 ", disk2, quota_bytes=1024)
+    assert (store["name"], store["type"], store["is_default"]) == ("disk2", "filesystem", False)
+    assert store["path"] == str(disk2.resolve()) and disk2.is_dir()  # created
+    assert store["available"] is True and store["quota_bytes"] == 1024
+
+    default_path = app.state.settings.storage_path
+    a_file = tmp_path / "file"
+    a_file.write_text("x")
+    cases = [
+        ({"name": "disk2", "path": str(tmp_path / "other")}, "blob_store_name_taken"),
+        ({"name": "bad name", "path": str(tmp_path / "other")}, "validation_error"),
+        ({"name": "rel", "path": "relative/path"}, "blob_store_path_invalid"),
+        ({"name": "same", "path": str(default_path)}, "blob_store_path_overlap"),
+        ({"name": "nested", "path": str(default_path / "sub")}, "blob_store_path_overlap"),
+        ({"name": "parent", "path": str(tmp_path / "disk2")}, "blob_store_path_overlap"),
+        ({"name": "nowrite", "path": str(a_file / "sub")}, "blob_store_path_not_writable"),
+    ]
+    for body, code in cases:
+        response = await admin_api.post("/api/v1/blob-stores", json=body)
+        assert response.json()["error"]["code"] == code, body
+
+
+async def test_update_and_delete_rules(app, admin_api, blobs, store_id, tmp_path: Path) -> None:
+    store = await add_store(admin_api, "disk2", tmp_path / "disk2")
+    url = f"/api/v1/blob-stores/{store['id']}"
+
+    body = (await admin_api.patch(url, json={"name": "fast", "quota_bytes": 10})).json()
+    assert (body["name"], body["quota_bytes"]) == ("fast", 10)
+    assert (await admin_api.patch(url, json={"quota_bytes": None})).json()["quota_bytes"] is None
+    moved = (await admin_api.patch(url, json={"path": str(tmp_path / "disk3")})).json()
+    assert moved["path"] == str((tmp_path / "disk3").resolve())
+
+    await create_blob(app, blobs, store["id"], b"data")
+    response = await admin_api.patch(url, json={"path": str(tmp_path / "disk4")})
+    assert response.json()["error"]["code"] == "blob_store_not_empty"
+    assert (await admin_api.delete(url)).json()["error"]["code"] == "blob_store_not_empty"
+
+    default_url = f"/api/v1/blob-stores/{store_id}"
+    for body in ({"name": "main"}, {"path": str(tmp_path / "x")}):
+        response = await admin_api.patch(default_url, json=body)
+        assert response.json()["error"]["code"] == "blob_store_is_default"
+    assert (await admin_api.patch(default_url, json={"quota_bytes": 5})).status_code == 200
+    response = await admin_api.delete(default_url)
+    assert response.json()["error"]["code"] == "blob_store_is_default"
+
+    empty = await add_store(admin_api, "empty", tmp_path / "empty")
+    assert (await admin_api.delete(f"/api/v1/blob-stores/{empty['id']}")).status_code == 204
+    assert (tmp_path / "empty").is_dir()  # files on disk are not touched
+
+
+async def test_check_does_not_create_missing_directory(admin_api, tmp_path: Path) -> None:
+    store = await add_store(admin_api, "disk2", tmp_path / "disk2")
+    url = f"/api/v1/blob-stores/{store['id']}"
+    assert (await admin_api.post(f"{url}/check")).json()["ok"] is True
+
+    shutil.rmtree(tmp_path / "disk2")  # e.g. the bind mount is gone
+    result = (await admin_api.post(f"{url}/check")).json()
+    assert (result["ok"], result["error_code"]) == (False, "blob_store_path_missing")
+    assert not (tmp_path / "disk2").exists()
+    assert (await admin_api.get(url)).json()["available"] is False
+
+
+async def test_quota_blocks_new_blobs(app, admin_api, blobs, store_id) -> None:
+    await admin_api.patch(f"/api/v1/blob-stores/{store_id}", json={"quota_bytes": 10})
+    await create_blob(app, blobs, store_id, b"0123456789")  # reaches the quota
+    blobs.forget(store_id)  # drop the cached stored size
+    async with app.state.db_sessionmaker() as db:
+        with pytest.raises(QuotaExceededError):
+            await blobs.upload(db, store_id)
+    store = (await admin_api.get(f"/api/v1/blob-stores/{store_id}")).json()
+    assert store["quota_exceeded"] is True
+
+
+async def test_migrate_all_blobs(app, admin_api, blobs, store_id, tmp_path: Path) -> None:
+    payloads = [f"blob {i}".encode() * 100 for i in range(5)]
+    created = [await create_blob(app, blobs, store_id, data) for data in payloads]
+    deleted = await create_blob(app, blobs, store_id, b"pending deletion")
+    async with app.state.db_sessionmaker() as db:
+        await db.execute(
+            update(Blob).where(Blob.id == deleted.id).values(deleted_at=datetime.now(UTC))
+        )
+        await db.commit()
+    target = await add_store(admin_api, "disk2", tmp_path / "disk2")
+    migrate_url = f"/api/v1/blob-stores/{store_id}/migrate"
+
+    response = await admin_api.post(migrate_url, json={"target_store_id": target["id"]})
+    assert response.status_code == 202
+    again = await admin_api.post(migrate_url, json={"target_store_id": target["id"]})
+    assert again.json()["error"]["code"] == "job_already_active"
+    busy = await admin_api.delete(f"/api/v1/blob-stores/{target['id']}")
+    assert busy.json()["error"]["code"] == "blob_store_in_use"
+    same = await admin_api.post(migrate_url, json={"target_store_id": store_id})
+    assert same.json()["error"]["code"] == "blob_store_same"
+
+    await app.state.job_runner.run_pending()
+    async with app.state.db_sessionmaker() as db:
+        job = await db.scalar(select(Job).order_by(Job.id.desc()).limit(1))
+        assert job.status == "succeeded", job.error
+        assert job.result["moved"] == 5
+        rows = {b.id: b for b in await db.scalars(select(Blob))}
+        for blob, data in zip(created, payloads, strict=True):
+            assert rows[blob.id].blob_store_id == target["id"]
+            assert await read_all(await blobs.read(db, rows[blob.id])) == data
+        assert rows[deleted.id].blob_store_id == store_id  # left for garbage collection
+
+    source = FilesystemBlobStorage(app.state.settings.storage_path)
+    assert [item.blob_id async for item in source.iterate()] == [deleted.id]
+
+
+async def test_migrate_reports_missing_source_objects(
+    app, admin_api, blobs, store_id, tmp_path: Path
+) -> None:
+    good = await create_blob(app, blobs, store_id, b"good")
+    lost = await create_blob(app, blobs, store_id, b"lost")
+    await FilesystemBlobStorage(app.state.settings.storage_path).delete(lost.id)
+    target = await add_store(admin_api, "disk2", tmp_path / "disk2")
+    await admin_api.post(
+        f"/api/v1/blob-stores/{store_id}/migrate", json={"target_store_id": target["id"]}
+    )
+    await app.state.job_runner.run_pending()
+    async with app.state.db_sessionmaker() as db:
+        job = await db.scalar(select(Job).order_by(Job.id.desc()).limit(1))
+        assert job.status == "failed" and "1 blobs could not be moved" in job.error
+        assert (await db.get(Blob, good.id)).blob_store_id == target["id"]
+        assert (await db.get(Blob, lost.id)).blob_store_id == store_id
+
+
+async def test_cleanup_treats_copies_in_other_stores_as_orphans(
+    app, admin_api, blobs, store_id, tmp_path: Path
+) -> None:
+    blob = await create_blob(app, blobs, store_id, b"original")
+    await add_store(admin_api, "disk2", tmp_path / "disk2")
+    stray = FilesystemBlobStorage(tmp_path / "disk2")
+    writer = await stray.open_write(blob.id)  # e.g. left by an interrupted migration
+    await writer.write(b"original")
+    await writer.commit()
+    make_old(stray.path_for(blob.id))
+    make_old(FilesystemBlobStorage(app.state.settings.storage_path).path_for(blob.id))
+
+    job = await run_job(app, STORE_CLEANUP_JOB)
+    assert job.result["orphans_removed"] == 1
+    assert await stray.stat(blob.id) is None

@@ -499,7 +499,8 @@ export interface paths {
         /** List Blob Stores */
         get: operations["list_blob_stores_api_v1_blob_stores_get"];
         put?: never;
-        post?: never;
+        /** Create Blob Store */
+        post: operations["create_blob_store_api_v1_blob_stores_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -517,6 +518,45 @@ export interface paths {
         get: operations["get_blob_store_api_v1_blob_stores__store_id__get"];
         put?: never;
         post?: never;
+        /** Delete Blob Store */
+        delete: operations["delete_blob_store_api_v1_blob_stores__store_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Blob Store */
+        patch: operations["update_blob_store_api_v1_blob_stores__store_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/blob-stores/{store_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Blob Store */
+        post: operations["check_blob_store_api_v1_blob_stores__store_id__check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/blob-stores/{store_id}/migrate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Migrate Blob Store
+         * @description Move all blobs of the store to another store (background job).
+         */
+        post: operations["migrate_blob_store_api_v1_blob_stores__store_id__migrate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -544,6 +584,34 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BlobStoreCheckOut */
+        BlobStoreCheckOut: {
+            /** Ok */
+            ok: boolean;
+            /** Error Code */
+            error_code?: string | null;
+            /** Message */
+            message?: string | null;
+            /** Total Bytes */
+            total_bytes?: number | null;
+            /** Free Bytes */
+            free_bytes?: number | null;
+        };
+        /** BlobStoreCreateIn */
+        BlobStoreCreateIn: {
+            /** Name */
+            name: string;
+            /**
+             * Type
+             * @default filesystem
+             * @constant
+             */
+            type: "filesystem";
+            /** Path */
+            path: string;
+            /** Quota Bytes */
+            quota_bytes?: number | null;
+        };
         /** BlobStoreOut */
         BlobStoreOut: {
             /** Id */
@@ -552,8 +620,12 @@ export interface components {
             name: string;
             /** Type */
             type: string;
+            /** Is Default */
+            is_default: boolean;
             /** Path */
             path: string | null;
+            /** Available */
+            available: boolean;
             /** Total Bytes */
             total_bytes: number | null;
             /** Free Bytes */
@@ -562,6 +634,10 @@ export interface components {
             low_space_threshold_bytes: number | null;
             /** Low Space */
             low_space: boolean;
+            /** Quota Bytes */
+            quota_bytes: number | null;
+            /** Quota Exceeded */
+            quota_exceeded: boolean;
             /** Blob Count */
             blob_count: number;
             /** Used Bytes */
@@ -570,11 +646,25 @@ export interface components {
             pending_delete_count: number;
             /** Pending Delete Bytes */
             pending_delete_bytes: number;
+            /** Migration Job Id */
+            migration_job_id: number | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+        };
+        /**
+         * BlobStoreUpdateIn
+         * @description Omitted fields are left unchanged; quota_bytes = null removes the quota.
+         */
+        BlobStoreUpdateIn: {
+            /** Name */
+            name?: string | null;
+            /** Path */
+            path?: string | null;
+            /** Quota Bytes */
+            quota_bytes?: number | null;
         };
         /** ChangeOwnPasswordIn */
         ChangeOwnPasswordIn: {
@@ -998,6 +1088,11 @@ export interface components {
             created_at: string;
             /** Is Admin */
             is_admin: boolean;
+        };
+        /** MigrateIn */
+        MigrateIn: {
+            /** Target Store Id */
+            target_store_id: number;
         };
         /** ReadinessResponse */
         ReadinessResponse: {
@@ -2296,6 +2391,39 @@ export interface operations {
             };
         };
     };
+    create_blob_store_api_v1_blob_stores_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BlobStoreCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlobStoreOut"];
+                };
+            };
+            /** @description Default Response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     get_blob_store_api_v1_blob_stores__store_id__get: {
         parameters: {
             query?: never;
@@ -2314,6 +2442,136 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BlobStoreOut"];
+                };
+            };
+            /** @description Default Response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_blob_store_api_v1_blob_stores__store_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                store_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Default Response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_blob_store_api_v1_blob_stores__store_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                store_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BlobStoreUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlobStoreOut"];
+                };
+            };
+            /** @description Default Response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    check_blob_store_api_v1_blob_stores__store_id__check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                store_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlobStoreCheckOut"];
+                };
+            };
+            /** @description Default Response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    migrate_blob_store_api_v1_blob_stores__store_id__migrate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                store_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MigrateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
                 };
             };
             /** @description Default Response */

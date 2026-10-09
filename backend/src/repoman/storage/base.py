@@ -19,6 +19,10 @@ class StorageFullError(Exception):
     """No space left, or free space is below the low-space threshold."""
 
 
+class QuotaExceededError(StorageFullError):
+    """The stored size of the blob store reached its quota."""
+
+
 @dataclass(frozen=True)
 class BlobStat:
     blob_id: UUID

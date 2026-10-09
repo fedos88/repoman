@@ -154,6 +154,8 @@ class BlobStore(Base):
     name: Mapped[str] = mapped_column(String(64), unique=True)
     type: Mapped[str] = mapped_column(String(16))
     config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    # Soft quota: no new blobs once the stored size reaches it (NULL = unlimited).
+    quota_bytes: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, server_default=func.now()
     )

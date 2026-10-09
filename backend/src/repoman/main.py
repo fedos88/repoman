@@ -19,7 +19,8 @@ from repoman.ldap import sync as ldap_sync
 from repoman.ldap.service import LdapService
 from repoman.storage.bootstrap import ensure_default_store
 from repoman.storage.gc import blob_gc, blob_store_cleanup
-from repoman.storage.policy import BLOB_GC_JOB, STORE_CLEANUP_JOB
+from repoman.storage.migrate import blob_migrate
+from repoman.storage.policy import BLOB_GC_JOB, BLOB_MIGRATE_JOB, STORE_CLEANUP_JOB
 from repoman.storage.service import BlobService
 from repoman.users.bootstrap import ensure_admin
 
@@ -75,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ldap_sync.JOB_TYPE: ldap_sync.ldap_sync,
             BLOB_GC_JOB: blob_gc,
             STORE_CLEANUP_JOB: blob_store_cleanup,
+            BLOB_MIGRATE_JOB: blob_migrate,
         },
         services={"ldap": app.state.ldap, "blobs": app.state.blobs},
     )

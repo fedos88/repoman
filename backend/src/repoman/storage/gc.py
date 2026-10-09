@@ -7,6 +7,7 @@ from sqlalchemy import delete, select
 
 from repoman.db.models import Blob, BlobStore
 from repoman.jobs.runner import JobContext
+from repoman.storage.base import BlobStat, BlobStorage
 from repoman.storage.policy import GC_GRACE_PERIOD, ORPHAN_MIN_AGE
 from repoman.storage.service import BlobService
 
@@ -63,9 +64,9 @@ async def blob_store_cleanup(ctx: JobContext) -> dict[str, Any]:
             if item.modified_at < threshold:
                 candidates.append(item)
             if len(candidates) >= BATCH_SIZE:
-                await _remove_orphans(ctx, storage, candidates, stats)
+                await _remove_orphans(ctx, store_id, storage, candidates, stats)
                 candidates = []
-        await _remove_orphans(ctx, storage, candidates, stats)
+        await _remove_orphans(ctx, store_id, storage, candidates, stats)
         await ctx.progress(stats["checked"])
 
     await ctx.log(
@@ -75,13 +76,26 @@ async def blob_store_cleanup(ctx: JobContext) -> dict[str, Any]:
     return stats
 
 
-async def _remove_orphans(ctx: JobContext, storage, candidates, stats: dict[str, int]) -> None:
+async def _remove_orphans(
+    ctx: JobContext,
+    store_id: int,
+    storage: BlobStorage,
+    candidates: list[BlobStat],
+    stats: dict[str, int],
+) -> None:
     if not candidates:
         return
     await ctx.check_cancelled()
     async with ctx.sessionmaker() as db:
+        # A blob belongs to exactly one store: a copy left in another store
+        # (e.g. by an interrupted migration) is an orphan there.
         known = set(
-            await db.scalars(select(Blob.id).where(Blob.id.in_([c.blob_id for c in candidates])))
+            await db.scalars(
+                select(Blob.id).where(
+                    Blob.blob_store_id == store_id,
+                    Blob.id.in_([c.blob_id for c in candidates]),
+                )
+            )
         )
     for item in candidates:
         if item.blob_id not in known:

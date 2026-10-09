@@ -20,3 +20,7 @@ BLOB_GC_JOB = "blob_gc"
 BLOB_GC_INTERVAL_SECONDS = 3600
 STORE_CLEANUP_JOB = "blob_store_cleanup"
 STORE_CLEANUP_INTERVAL_SECONDS = 86400
+# Stored size of a store is re-read from the database at most this often (quota checks).
+STORED_BYTES_CACHE_SECONDS = 30
+
+BLOB_MIGRATE_JOB = "blob_migrate"
