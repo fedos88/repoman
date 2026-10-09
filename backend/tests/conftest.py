@@ -80,7 +80,7 @@ async def app(migrated_database: str, tmp_path: Path) -> AsyncIterator[FastAPI]:
         await connection.execute(
             text(
                 "TRUNCATE users, user_roles, sessions, api_tokens, jobs, job_logs, schedules, "
-                "ldap_settings, ldap_group_mappings RESTART IDENTITY CASCADE"
+                "blobs, blob_stores, ldap_settings, ldap_group_mappings RESTART IDENTITY CASCADE"
             )
         )
     yield app

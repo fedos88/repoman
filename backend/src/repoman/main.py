@@ -17,6 +17,11 @@ from repoman.errors import ErrorResponse, install_error_handlers
 from repoman.jobs.runner import JobRunner
 from repoman.ldap import sync as ldap_sync
 from repoman.ldap.service import LdapService
+from repoman.storage.bootstrap import ensure_default_store
+from repoman.storage.gc import blob_gc, blob_store_cleanup
+from repoman.storage.migrate import blob_migrate
+from repoman.storage.policy import BLOB_GC_JOB, BLOB_MIGRATE_JOB, STORE_CLEANUP_JOB
+from repoman.storage.service import BlobService
 from repoman.users.bootstrap import ensure_admin
 
 
@@ -34,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         tasks: list[asyncio.Task] = []
         try:
             await ensure_admin(app.state.db_sessionmaker, settings)
+            await ensure_default_store(app.state.db_sessionmaker, settings)
             runner: JobRunner = app.state.job_runner
             tasks = [
                 asyncio.create_task(runner.worker_loop(), name="job-worker"),
@@ -63,10 +69,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.db_sessionmaker = create_sessionmaker(app.state.db_engine)
     app.state.login_rate_limiter = LoginRateLimiter()
     app.state.ldap = LdapService(SecretBox(settings.secret_key))
+    app.state.blobs = BlobService()
     app.state.job_runner = JobRunner(
         app.state.db_sessionmaker,
-        {ldap_sync.JOB_TYPE: ldap_sync.ldap_sync},
-        services={"ldap": app.state.ldap},
+        {
+            ldap_sync.JOB_TYPE: ldap_sync.ldap_sync,
+            BLOB_GC_JOB: blob_gc,
+            STORE_CLEANUP_JOB: blob_store_cleanup,
+            BLOB_MIGRATE_JOB: blob_migrate,
+        },
+        services={"ldap": app.state.ldap, "blobs": app.state.blobs},
     )
 
     install_error_handlers(app)

@@ -9,7 +9,8 @@
     "users": "Users",
     "admin": "Administration",
     "ldap": "Active Directory",
-    "jobs": "Jobs"
+    "jobs": "Jobs",
+    "storage": "Storage"
   },
   "header": {
     "toggleTheme": "Toggle theme",
@@ -160,7 +161,17 @@
     "ldap_base_dn_not_found": "Base DN not found",
     "ldap_invalid_filter": "Invalid LDAP filter",
     "ldap_search_failed": "LDAP search failed",
-    "ldap_secret_unreadable": "The saved password cannot be decrypted (was REPOMAN_SECRET_KEY changed?) — enter it again"
+    "ldap_secret_unreadable": "The saved password cannot be decrypted (was REPOMAN_SECRET_KEY changed?) — enter it again",
+    "blob_store_not_found": "Blob store not found",
+    "blob_store_name_taken": "A storage with this name already exists",
+    "blob_store_path_invalid": "The path must be absolute",
+    "blob_store_path_overlap": "The path is the same as or nested in another storage's path",
+    "blob_store_path_not_writable": "The directory is not writable",
+    "blob_store_path_missing": "The storage directory does not exist (not mounted?)",
+    "blob_store_not_empty": "Only possible for an empty storage",
+    "blob_store_is_default": "Not available for the default storage",
+    "blob_store_in_use": "The storage takes part in a running migration",
+    "blob_store_same": "Source and target storages are the same"
   },
   "home": {
     "tagline": "A free open-source repository manager that proxies and caches upstream sources.",
@@ -335,7 +346,10 @@
     "logsTitle": "Job #{{id}}: {{type}}",
     "cancel": "Cancel",
     "types": {
-      "ldap_sync": "AD synchronization"
+      "ldap_sync": "AD synchronization",
+      "blob_gc": "Blob removal",
+      "blob_store_cleanup": "Storage cleanup",
+      "blob_migrate": "Move between storages"
     },
     "statuses": {
       "queued": "Queued",
@@ -343,6 +357,57 @@
       "succeeded": "Succeeded",
       "failed": "Failed",
       "cancelled": "Cancelled"
+    }
+  },
+  "storage": {
+    "title": "Storage",
+    "types": {
+      "filesystem": "Filesystem",
+      "s3": "S3"
+    },
+    "disk": "Disk",
+    "diskUsage": "{{used}} of {{total}} used, {{free}} free",
+    "blobCount": "Objects",
+    "usedBytes": "Objects size",
+    "pendingDelete": "Pending deletion",
+    "pendingDeleteHint": "Deleted objects are physically removed after 24 hours to keep backups consistent.",
+    "lowSpaceThreshold": "Low-space threshold",
+    "lowSpaceTitle": "Low free space",
+    "lowSpace": "Less than {{threshold}} free: new objects are not stored, proxy repositories serve files without caching.",
+    "create": "Add storage",
+    "createTitle": "New storage",
+    "editTitle": "Storage {{name}}",
+    "name": "Name",
+    "nameHint": "Lowercase Latin letters, digits and \"-\"",
+    "path": "Path",
+    "pathHint": "Absolute path to a directory on a local filesystem (not NFS). It is created if missing. In a container, use the path inside the container (mount a host directory with a bind mount).",
+    "pathDefaultHint": "The path of the default storage is set by REPOMAN_STORAGE_PATH",
+    "pathLockedHint": "The path can be changed only for an empty storage. Use migration to move data.",
+    "quota": "Quota",
+    "quotaHint": "Optional. When the quota is reached, new objects are not stored (a write in progress is completed).",
+    "quotaUsage": "{{used}} of {{quota}}",
+    "quotaExceededTitle": "Quota exceeded",
+    "quotaExceeded": "New objects are not stored in this storage; proxy repositories serve files without caching.",
+    "default": "default",
+    "unavailable": "Unavailable",
+    "migrating": "Migration in progress",
+    "check": "Check availability",
+    "checkOk": "Storage is writable",
+    "migrate": "Move content",
+    "migrateTitle": "Move content of storage {{name}}",
+    "migrateDescription_one": "The storage holds {{count}} object ({{size}}).",
+    "migrateDescription_other": "The storage holds {{count}} objects ({{size}}).",
+    "migrateTarget": "Target storage",
+    "migrateTargetPlaceholder": "Select a storage",
+    "migrateConfirm": "Confirm the move",
+    "migrateWarning": "All objects will be copied to \"{{target}}\" with checksum verification and removed from \"{{source}}\". It runs in the background and can be cancelled on the Jobs page. Do not back up the storages during the move — the backup may be inconsistent.",
+    "migrateStarted": "Move started — see progress on the Jobs page",
+    "deleteTitle": "Delete storage",
+    "deleteConfirm": "Delete storage {{name}}? Only an empty storage can be deleted; files on disk are not removed.",
+    "validation": {
+      "name": "Lowercase Latin letters, digits and \"-\", up to 64 characters",
+      "path": "Enter an absolute path",
+      "quota": "Quota must be greater than zero"
     }
   }
 }

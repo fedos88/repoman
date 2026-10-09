@@ -1,6 +1,7 @@
 import { Anchor, AppShell, Button, Container, Group, Menu, Text } from '@mantine/core';
 import {
   IconChevronDown,
+  IconDatabase,
   IconListCheck,
   IconPackages,
   IconSitemap,
@@ -30,6 +31,9 @@ function AdminMenu() {
         </Menu.Item>
         <Menu.Item component={Link} to="/admin/ldap" leftSection={<IconSitemap size={16} />}>
           {t('nav.ldap')}
+        </Menu.Item>
+        <Menu.Item component={Link} to="/admin/storage" leftSection={<IconDatabase size={16} />}>
+          {t('nav.storage')}
         </Menu.Item>
         <Menu.Item component={Link} to="/admin/jobs" leftSection={<IconListCheck size={16} />}>
           {t('nav.jobs')}

@@ -4,6 +4,7 @@ import { CHANGE_PASSWORD_PATH, RequireAuth } from './auth/guards';
 import { Layout } from './components/Layout';
 import { JobsPage } from './pages/admin/JobsPage';
 import { LdapPage } from './pages/admin/LdapPage';
+import { StoragePage } from './pages/admin/StoragePage';
 import { UsersPage } from './pages/admin/UsersPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { HomePage } from './pages/HomePage';
@@ -46,6 +47,14 @@ export function App() {
           element={
             <RequireAuth admin>
               <LdapPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="admin/storage"
+          element={
+            <RequireAuth admin>
+              <StoragePage />
             </RequireAuth>
           }
         />
