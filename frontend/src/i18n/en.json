@@ -1,0 +1,348 @@
+{
+  "app": {
+    "name": "RepoMan"
+  },
+  "nav": {
+    "home": "Home",
+    "apiDocs": "API",
+    "profile": "Profile",
+    "users": "Users",
+    "admin": "Administration",
+    "ldap": "Active Directory",
+    "jobs": "Jobs"
+  },
+  "header": {
+    "toggleTheme": "Toggle theme",
+    "language": "Language"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "signInTitle": "Sign in to RepoMan",
+    "username": "Username",
+    "password": "Password"
+  },
+  "validation": {
+    "required": "Required",
+    "passwordMinLength_one": "At least {{count}} character",
+    "passwordMinLength_other": "At least {{count}} characters",
+    "passwordsDoNotMatch": "Passwords do not match",
+    "username": "Lowercase Latin letters, digits, \".\", \"_\", \"-\"; up to 64 characters",
+    "email": "Invalid email"
+  },
+  "common": {
+    "copy": "Copy",
+    "copied": "Copied",
+    "done": "Done",
+    "cancel": "Cancel",
+    "create": "Create",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "actions": "Actions"
+  },
+  "profile": {
+    "title": "Profile",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Repeat new password",
+    "changePassword": "Change password",
+    "changePasswordTitle": "Change password",
+    "changePasswordRequired": "You must change your password before continuing.",
+    "passwordChanged": "Password changed"
+  },
+  "tokens": {
+    "title": "API tokens",
+    "description": "Tokens are used for automation (Authorization: Bearer) and for apt access to private repositories (Basic: username + token).",
+    "empty": "No tokens",
+    "name": "Name",
+    "namePlaceholder": "e.g. gitlab-runner",
+    "prefix": "Token",
+    "created": "Created",
+    "expires": "Expires",
+    "lastUsed": "Last used",
+    "never": "Never",
+    "expired": "Expired",
+    "revoke": "Revoke",
+    "revokeTitle": "Revoke token",
+    "revokeConfirm": "Revoke token \"{{name}}\"? Automation that uses it will stop working.",
+    "createTitle": "New API token",
+    "create": "Create token",
+    "lifetime": "Lifetime",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "shownOnce": "Copy the token now — it is shown only once.",
+    "usageHint": "Usage: Authorization: Bearer <token>, or Basic with your username and the token as the password."
+  },
+  "users": {
+    "title": "Users",
+    "create": "New user",
+    "createTitle": "New user",
+    "editTitle": "User {{username}}",
+    "username": "Username",
+    "usernameHint": "Latin letters, digits, \".\", \"_\", \"-\"",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "displayName": "Display name",
+    "email": "Email",
+    "source": "Source",
+    "sources": {
+      "local": "Local",
+      "ldap": "AD"
+    },
+    "roles": "Roles",
+    "statusTitle": "Status",
+    "status": {
+      "active": "Active",
+      "blocked": "Blocked",
+      "blockedByLdap": "Blocked (AD)"
+    },
+    "lastLogin": "Last sign-in",
+    "grantAdmin": "Make administrator",
+    "revokeAdmin": "Revoke administrator",
+    "mustChangePassword": "Require password change at sign-in",
+    "resetPassword": "Reset password",
+    "resetPasswordTitle": "Reset password: {{username}}",
+    "passwordReset": "Password reset",
+    "tokens": "API tokens",
+    "tokensTitle": "API tokens of {{username}}",
+    "block": "Block",
+    "unblock": "Unblock",
+    "blockTitle": "Block user",
+    "unblockTitle": "Unblock user",
+    "blockConfirm": "Block user {{username}}? Their sessions will be ended and tokens will stop working.",
+    "unblockConfirm": "Unblock user {{username}}?",
+    "deleteTitle": "Delete user",
+    "deleteConfirm": "Delete user {{username}}? This cannot be undone.",
+    "searchPlaceholder": "Search by name or email",
+    "empty": "No users found"
+  },
+  "errors": {
+    "unknown_error": "Unknown error",
+    "network_error": "Server is unavailable",
+    "invalid_credentials": "Invalid username or password",
+    "user_blocked": "User is blocked",
+    "too_many_attempts": "Too many failed sign-in attempts. Try again later.",
+    "not_authenticated": "Sign-in required",
+    "forbidden": "Insufficient permissions",
+    "csrf_failed": "Session is outdated, reload the page",
+    "password_change_required": "Password change required",
+    "invalid_token": "Invalid or expired token",
+    "invalid_current_password": "Current password is incorrect",
+    "user_not_found": "User not found",
+    "username_taken": "Username is already taken",
+    "ldap_user_readonly": "Profile of a domain user is managed in AD",
+    "ldap_user_cannot_be_deleted": "Domain users can only be blocked",
+    "ldap_user_password": "Password of a domain user is managed in AD",
+    "cannot_delete_self": "You cannot delete yourself",
+    "cannot_block_self": "You cannot block yourself",
+    "last_admin": "The last active administrator cannot be removed or demoted",
+    "role_not_assignable": "This role cannot be assigned explicitly",
+    "role_not_found": "Role not found",
+    "token_not_found": "Token not found",
+    "validation_error": "Check the entered values",
+    "not_found": "Not found",
+    "ldap_unavailable": "LDAP server is unavailable",
+    "username_exists_in_ldap": "A domain user with this name exists",
+    "job_already_active": "The job is already queued or running",
+    "job_not_found": "Job not found",
+    "job_not_cancellable": "The job has already finished",
+    "ldap_disabled": "LDAP is disabled",
+    "ldap_bind_password_required": "Enter the service account password",
+    "ldap_settings_incomplete": "Fill in the server, service account and Base DN",
+    "group_mapping_exists": "This mapping already exists",
+    "group_mapping_not_found": "Mapping not found",
+    "ldap_tls_error": "Server TLS certificate validation failed (CA or server name)",
+    "ldap_connection_failed": "Cannot connect to the server",
+    "ldap_signing_required": "The server requires LDAP signing — use LDAPS or StartTLS",
+    "ldap_bind_failed": "Service account sign-in failed",
+    "ldap_invalid_credentials": "Invalid credentials",
+    "ldap_base_dn_not_found": "Base DN not found",
+    "ldap_invalid_filter": "Invalid LDAP filter",
+    "ldap_search_failed": "LDAP search failed",
+    "ldap_secret_unreadable": "The saved password cannot be decrypted (was REPOMAN_SECRET_KEY changed?) — enter it again"
+  },
+  "home": {
+    "tagline": "A free open-source repository manager that proxies and caches upstream sources.",
+    "intro": "RepoMan is built as a lightweight, modern alternative to commercial and limited Community editions for running a local cache of software dependencies and artifacts.",
+    "openApiDocs": "API documentation",
+    "status": {
+      "title": "Early development",
+      "text": "The API, configuration format and internal architecture may change before the first stable release. The project is not yet recommended for production use."
+    },
+    "why": {
+      "title": "Why RepoMan?",
+      "text": "Developers, servers and CI/CD systems download the same data from external sources over and over again. RepoMan sits between clients and external repositories: on the first request it fetches an artifact from upstream and stores it locally, subsequent requests are served from the cache.",
+      "benefits": {
+        "traffic": "reduce external traffic",
+        "ci": "speed up CI/CD",
+        "availability": "depend less on the availability of external services",
+        "central": "centralize access to external repositories",
+        "downloads": "reduce repeated downloads",
+        "single": "use a single proxy/cache inside your infrastructure"
+      }
+    },
+    "features": {
+      "title": "Key features",
+      "free": {
+        "title": "Free, no artificial limits",
+        "text": "No limits on the number of components, users or requests."
+      },
+      "proxy": {
+        "title": "Proxy & Cache",
+        "text": "Automatic caching of artifacts from upstream repositories."
+      },
+      "formats": {
+        "title": "Multiple formats",
+        "text": "A single access point for different package managers."
+      },
+      "openSource": {
+        "title": "Open Source",
+        "text": "Source code is distributed under the Apache 2.0 license."
+      },
+      "deploy": {
+        "title": "Easy deployment",
+        "text": "Minimal components and simple configuration."
+      },
+      "container": {
+        "title": "Container-friendly",
+        "text": "Runs in Docker."
+      },
+      "linux": {
+        "title": "Linux",
+        "text": "Target platform; development is possible on macOS and Windows (via Docker)."
+      },
+      "ops": {
+        "title": "Production-ready",
+        "text": "Metrics, cache management and observability."
+      },
+      "api": {
+        "title": "API-first",
+        "text": "All configuration via REST API and Web UI, easy to automate (Ansible, Terraform, curl)."
+      }
+    },
+    "formats": {
+      "title": "Planned formats",
+      "columns": {
+        "format": "Format",
+        "purpose": "Purpose",
+        "status": "Status"
+      },
+      "statusInDevelopment": "In development",
+      "raw": "Arbitrary HTTP files and binary artifacts",
+      "npm": "npm Registry",
+      "go": "Go Modules Proxy",
+      "apt": "Debian / Ubuntu repositories",
+      "yum": "RHEL / Rocky / AlmaLinux / Fedora repositories",
+      "docker": "Container Registry"
+    },
+    "principle": {
+      "title": "Core principle",
+      "text": "RepoMan does not aim to be a large Software Supply Chain platform. The project's goal is simple:",
+      "quote": "One local service for fast and reliable caching of software dependencies."
+    }
+  },
+  "footer": {
+    "license": "Licensed under the Apache License 2.0",
+    "version": "Version {{version}}"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "text": "The requested page does not exist.",
+    "back": "Back to home"
+  },
+  "ldap": {
+    "title": "Active Directory / LDAP",
+    "connection": "Connection",
+    "enabled": "Enabled",
+    "mode": "Mode",
+    "modes": {
+      "ldap": "No TLS"
+    },
+    "host": "Server",
+    "port": "Port",
+    "verifyCertificate": "Verify server certificate",
+    "caCertificate": "CA certificate (PEM)",
+    "caCertificateHint": "Root certificate of your CA. If empty, system CAs are used. The server name must match the certificate.",
+    "bindDn": "Service account",
+    "bindDnHint": "DOMAIN\\user or DN",
+    "bindPassword": "Service account password",
+    "bindPasswordSaved": "Password is saved. Leave empty to keep it.",
+    "userBaseDn": "Where to search users (Base DN)",
+    "userBaseDnHint": "Any active user in this subtree can sign in, e.g. DC=example,DC=com or OU=Users,DC=example,DC=com",
+    "userFilter": "Additional LDAP filter",
+    "userFilterHint": "Optional. For example, allow sign-in only for members of a group (nested groups included).",
+    "advanced": "Advanced: attributes and synchronization",
+    "attrs": {
+      "username": "Login attribute",
+      "firstName": "First name attribute",
+      "lastName": "Last name attribute",
+      "displayName": "Display name attribute",
+      "email": "Email attribute"
+    },
+    "syncInterval": "Synchronization interval",
+    "minutes": "min",
+    "maxBlockRatio": "Mass-block protection",
+    "maxBlockRatioHint": "Synchronization is aborted if more than this share of users would be blocked",
+    "saved": "Settings saved",
+    "warnings": {
+      "plainTitle": "Unencrypted connection",
+      "plain": "Passwords of users and of the service account are sent over the network in clear text. Use only in an isolated network. Domain controllers that require LDAP signing (the default in Windows Server 2025) reject such connections.",
+      "noVerifyTitle": "Server certificate is not verified",
+      "noVerify": "Traffic is encrypted but not protected against server impersonation (MITM): an attacker in the network can capture passwords of users and of the service account. Providing the CA certificate is recommended."
+    },
+    "test": {
+      "run": "Test connection",
+      "username": "Test user (optional)",
+      "ok": "Connection succeeded",
+      "failed": "Connection failed",
+      "userFound": "User found",
+      "userNotFound": "The test user was not found in the Base DN with the filter applied.",
+      "disabled": "Disabled",
+      "roles": "Roles"
+    },
+    "mappings": {
+      "title": "Group to role mapping",
+      "description": "Group membership includes nested groups and the primary group. Groups affect only roles, not whether a user can sign in.",
+      "group": "Group",
+      "groupDn": "Group DN",
+      "role": "Role",
+      "add": "Add",
+      "deleteTitle": "Delete mapping?"
+    },
+    "sync": {
+      "title": "User synchronization",
+      "description": "Updates profiles and roles of domain users, blocks users disabled in AD or no longer in the Base DN / filter.",
+      "run": "Synchronize now",
+      "disabled": "LDAP is disabled",
+      "lastRun": "Last run",
+      "result": "Result",
+      "resultText": "Checked {{checked}}, updated {{updated}}, blocked {{blocked}}, unblocked {{unblocked}}",
+      "nextRun": "Next run"
+    }
+  },
+  "jobs": {
+    "title": "Jobs",
+    "allStatuses": "All statuses",
+    "empty": "No jobs",
+    "type": "Type",
+    "status": "Status",
+    "progress": "Progress",
+    "created": "Created",
+    "finished": "Finished",
+    "error": "Error",
+    "logs": "Log",
+    "logsTitle": "Job #{{id}}: {{type}}",
+    "cancel": "Cancel",
+    "types": {
+      "ldap_sync": "AD synchronization"
+    },
+    "statuses": {
+      "queued": "Queued",
+      "running": "Running",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    }
+  }
+}
